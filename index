@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的日常記賬本</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f5f7fb;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        h2 { text-align: center; color: #4a5568; }
+        .total-box {
+            background: #ebf8ff;
+            border: 1px solid #bee3f8;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #2b6cb0;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #4a5568;}
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        button:hover { background-color: #2b6cb0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+        }
+        th, td {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 12px;
+            text-align: left;
+        }
+        th { background-color: #f7fafc; color: #4a5568; }
+        .delete-btn {
+            background-color: #e53e3e;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .delete-btn:hover { background-color: #c53030; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📊 每月開支記錄</h2>
+    
+    <div class="total-box">
+        本月總開支：$<span id="totalAmount">0</span>
+    </div>
+
+    <form id="expenseForm">
+        <div class="form-group">
+            <label for="date">日期</label>
+            <input type="date" id="date" required>
+        </div>
+        <div class="form-group">
+            <label for="category">分類</label>
+            <select id="category">
+                <option value="食飯">🍔 食飯</option>
+                <option value="交通">🚇 交通</option>
+                <option value="娛樂">🎬 娛樂</option>
+                <option value="生活用品">🛒 生活用品</option>
+                <option value="其他">📦 其他</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="amount">金額 ($)</label>
+            <input type="number" id="amount" placeholder="例如: 50" required min="0" step="any">
+        </div>
+        <div class="form-group">
+            <label for="remarks">備註</label>
+            <input type="text" id="remarks" placeholder="寫啲字記低佢（選填）">
+        </div>
+        <button type="submit">記低佢 📝</button>
+    </form>
+
+    <table id="expenseTable">
+        <thead>
+            <tr>
+                <th>日期</th>
+                <th>分類</th>
+                <th>金額</th>
+                <th>備註</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody id="expenseList">
+            </tbody>
+    </table>
+</div>
+
+<script>
+    // 預設今日日期
+    document.getElementById('date').valueAsDate = new Date();
+
+    // 讀取 LocalStorage 入面嘅舊數據，如果冇就預設空 Array
+    let expenses = JSON.parse(localStorage.getItem('myExpenses')) || [];
+
+    // 初始化網頁：渲染列表同計算總數
+    function init() {
+        renderExpenses();
+        calculateTotal();
+    }
+
+    // 處理表單提交（新增項目）
+    document.getElementById('expenseForm').addEventListener('submit', function(e) {
+        e.preventDefault(); // 防止網頁重新整理
+        
+        const date = document.getElementById('date').value;
+        const category = document.getElementById('category').value;
+        const amount = parseFloat(document.getElementById('amount').value);
+        const remarks = document.getElementById('remarks').value;
+
+        const item = {
+            id: Date.now(), // 用時間戳做唯一 ID，方便刪除
+            date,
+            category,
+            amount,
+            remarks
+        };
+
+        expenses.push(item);
+        saveAndRefresh();
+        
+        // 清空輸入欄位（保留日期）
+        document.getElementById('amount').value = '';
+        document.getElementById('remarks').value = '';
+    });
+
+    // 渲染表格內容
+    function renderExpenses() {
+        const list = document.getElementById('expenseList');
+        list.innerHTML = ''; // 先清空舊內容
+
+        // 按日期由新到舊排序
+        expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        expenses.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.date}</td>
+                <td>${item.category}</td>
+                <td>$${item.amount.toFixed(1)}</td>
+                <td>${item.remarks || '-'}</td>
+                <td><button class="delete-btn" onclick="deleteItem(${item.id})">刪除</button></td>
+            `;
+            list.appendChild(tr);
+        });
+    }
+
+    // 計算總開支
+    function calculateTotal() {
+        const total = expenses.reduce((sum, item) => sum + item.amount, 0);
+        document.getElementById('totalAmount').innerText = total.toFixed(1);
+    }
+
+    // 刪除項目
+    function deleteItem(id) {
+        expenses = expenses.filter(item => item.id !== id);
+        saveAndRefresh();
+    }
+
+    // 儲存到 LocalStorage 並更新畫面
+    function saveAndRefresh() {
+        localStorage.setItem('myExpenses', JSON.stringify(expenses));
+        renderExpenses();
+        calculateTotal();
+    }
+
+    // 啟動！
+    init();
+</script>
+
+</body>
+</html>
